@@ -1,0 +1,532 @@
+---
+title: "Supplemental Materials for Children’s Use of Race in their Social Judgments: A multi-site, multi-racial group comparison"
+subtitle: "A submission to Collabra: Psychology, Munoz et al."
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=F}
+
+# load libraries
+library(tidyverse)
+library(corrr)
+library(modelsummary)
+library(lmerTest)
+library(ppcor)
+library(conflicted)
+
+select <- dplyr::select
+filter <- dplyr::filter
+lmer <- lmerTest::lmer
+
+# read main processed datafile (created by "ChIPS_Attitudes_produce_composites.R")
+all <- read_csv("race.composites.csv") %>%
+  mutate(ageCent = ageAtTest - (mean(ageAtTest,na.rm=T)))
+
+parentChild <- read_csv("parent.child.full.wide.csv")
+```
+
+## Overview
+
+The first section of this supplement provides supplemental tables breaking our main dependent measures down by both participant race and target race. 
+
+The second section provides a summary of several parental demographic measures that allow finer-grained characterization of our sample.
+
+The subsequent sections focus on analyses originally intended for other papers. For reasons described in the text, the main manuscript reports results that were originally proposed as part of several independent papers, each with their own independent set of preregistered analyses. In the interests of transparency this supplement presents the full set of analyses described in those preregistrations, all of which are available on OSF at the links provided below, with one exception described at the end of this section. The included pre-registrations are:
+
+ - [Attitudes across contexts](https://osf.io/9mya4)
+ - [Race attitudes as predictors of race-related behaviors](https://osf.io/n865m)
+ - [SES as a predictor for race outcomes](https://osf.io/w6zv8)
+ 
+We present the pre-registered analyses in full in the sub-sections below, absent a few minor deviations from what was described in the pre-registration, each of which are detailed in the relevant section below, highlighted by the bolded phrase 'deviation from preregistration'.
+
+One additional preregistration is not included here; it is [What predicts ingroup bias in race attitudes?](https://osf.io/3m9d8). It is not included because two of the primary predictors used in that proposed set of analyses (race-face memory and the minimal group task) have not yet been reported upon and will be included in other manuscripts by our team.
+ 
+
+
+## Supplementary tables for main measures sub-divided by participant race and race target
+
+In the main manuscript we report overall ingroup bias scores. However, outgroup targets varied across the other three racial groups, creating the possibility of examining results by specific racial contrasats (e.g. for a Latine child there were always Latine-Asian, Latine-Black, and Latine-White comparisons available). Here we report means and standard deviations for each comparison.  
+
+```{r supplementary child tables, warning=F}
+
+## Atttitudes
+attitudes <- all %>%
+  select(race,asianPref,blackPref,latinxPref,whitePref)
+datasummary_balance(~race,data=attitudes,fmt=2, title = "Attitude task by participant race. Range = 1 to 6")
+
+## Giving
+giving <- all %>%
+  select(race,asianGiving,blackGiving,latinxGiving,whiteGiving)
+datasummary_balance(~race,data=giving,fmt=2, title = "Resource allocation task by participant race. Range = 0 to 9")
+
+## Seating distance
+distance <- all %>%
+  select(race,asianDist,blackDist,latinxDist,whiteDist)
+datasummary_balance(~race,data=distance,fmt=2, title = "Seating distance task by participant race. Range = 0 to 6")
+
+## Status task
+status <- all %>%
+  select(race,asianBoss,blackBoss,latinxBoss,whiteBoss)
+datasummary_balance(~race,data=status,fmt=2, title = "Status task by participant race. Range = 0 to 9")
+
+
+```
+
+
+## Supplementary tables of parental demographic measures
+
+Here we provide a table of parental level of education, employment status, income, and political ideology.
+Note that political ideology was rated ona 7 point scale ranging from 1 = very liberal to 7 = very conservative.
+
+```{r supplementary parent tables, warning=F}
+
+# P_Income1, P_Income1_Sp; P_Political, P_Political_Sp; P_Edu1, P_Edu1_Sp, P_Edu2, P_Edu2_Sp
+# P_Employ1, P_Employ1_Other, P_Employ1_Other_Sp, P_Employ1_Sp, P_Employ2, P_Employ2_Other, P_Employ2_Other_Sp, P_Employ2_Sp
+
+# education: 1 = elem; 2 = JHs; 3 = HS; 4 = CC, AA; 5 = 4year; 6 = prof / grad
+# employment: 1 = full time, 2 = part-time, 3 = other
+# Income: 1 = < 25K, 2 = 25-50, 3 = 50-75, 4 = 75-125, 5 = > 125
+# political: 1 to 5 very lib to ver cons
+
+# grab columns
+parentDem <- parentChild %>%
+  select(ParticID,FinalRaceClassification,P_Income1, P_Income1_Sp, P_Politcal, P_Politcal_Sp, P_Edu1, P_Edu1_Sp, P_Edu2, P_Edu2_Sp,
+         P_Employ1, P_Employ1_Other, P_Employ1_Other_Sp, P_Employ1_Sp, P_Employ2, P_Employ2_Other, P_Employ2_Other_Sp, P_Employ2_Sp) %>%
+  rename(ChildRace = FinalRaceClassification) 
+
+# recode for highest level of education
+education <- parentDem %>% 
+  group_by(ParticID) %>%
+  mutate(highestEd = max(P_Income1, P_Income1_Sp,na.rm=T),
+         highestEd = ifelse(highestEd == "-Inf", NA, highestEd)) %>%
+  ungroup() %>%
+  mutate(education = plyr::mapvalues(factor(highestEd,ordered=T), from = c("1","2","3","4","5","6"), to = c("Elementary School","Middle School","High School", "2-yr College", "4-yr College", "Graduate Degree")))
+
+# output table
+datasummary_crosstab(ChildRace ~ education, data = education, title = "Highest level of parental education")
+
+# recode for employment status
+employ <- parentDem %>% 
+  group_by(ParticID) %>%
+  mutate(highestEmployment = max(P_Employ1, P_Employ1_Sp, P_Employ2, P_Employ2_Sp,na.rm=T),
+         highestEmployment = ifelse(highestEmployment == "-Inf", NA, highestEmployment)) %>%
+  ungroup() %>%
+  mutate(employment = plyr::mapvalues(factor(highestEmployment,ordered=T), from = c("1","2","3"), to = c("Full Time","Part Time","Other")))
+
+# output table
+datasummary_crosstab(ChildRace ~ employment, data = employ, title="Highest level of employment")
+
+
+# imcome
+income <- parentDem %>% 
+  group_by(ParticID) %>%
+  mutate(maxIncome = max(P_Income1, P_Income1_Sp,na.rm=T),
+         maxIncome = ifelse(maxIncome == "-Inf", NA, maxIncome)) %>%
+  ungroup() %>%
+  mutate(income = plyr::mapvalues(factor(maxIncome,ordered=T), from = c("1","2","3","4","5"), to = c("under $25K","$25K to $50K","$50K to $75K","$75K to $125K","above $125K")))
+
+# output table
+datasummary_crosstab(ChildRace ~ income, data = income, title="Reported family income")
+
+# politics, 1 = very liberal,  7 = very conservative
+politics <- parentDem %>%
+  filter(!is.na(ChildRace)) %>%
+  group_by(ParticID) %>%
+  mutate(polOr = max(P_Politcal, P_Politcal_Sp,na.rm=T),
+         polOr = ifelse(polOr == "-Inf", NA, polOr)) %>%
+  ungroup()
+
+politics %>%
+  group_by(ChildRace) %>%
+  summarise(AvgPoliticalOrientation = mean(polOr,na.rm=T),
+            SD = sd(polOr,na.rm=T))
+
+```
+
+## Attitudes Across Contexts (AAC)
+ 
+This pre-registration focused on the following four research questions:
+Question 1: Is there a relationship between the social status of a racial group and children’s attitudes towards that group? We predict a positive relationship between perceived social status and attitudes in that the more positive a child perceives the social status of a racial group the more positive attitudes a child will have toward that racial group.
+Question 2: Is there an effect of own-group preference on racial attitudes? We predict that each racial group will, on average, feel more positively about their ingroup than any other group of children are about that group.
+Question 3: If there is a relationship between perceived social status and preference for a racial group (Q1), is this link driven more by national status perceptions or local status perceptions (defined below)? We have no specic prediction for this question.
+Question 4: Is there a relationship between exposure to racial diversity (“pct” variable, described below) and children’s racial attitudes? We have no specific prediction for this question.
+
+Analysis proceeds via a linear mixed model predicting group attitude from the four independent measures described above, mean-centered, with random intercepts for participant and region.
+
+**Deviation from preregistration:** The specified mixed model is mispecified because including a random intercept for region is inappropriate given that with the exception of White participants other racial groups were only included in two regional data collections. That random intercept is ommitted in the model presented below. 
+
+Model output relevant to the four questions above was specified as:
+
+1. A statistically signifcant and positive parameter associated with one or both of the two status IVs (nation-level and local status)
+2. A statistically signifcant and positive parameter associated with the Ingroup IV
+3. A reliable difference between the parameter estimates (reflected in the non-overlap of the 90% confidence intervals around the parameter estimates) associated with the two status IVs
+4. A statistically significant parameter associated with the Pct IV
+
+
+
+```{r AAC reshape, warning=F}
+
+
+## reshape data for mixed model analysis
+AAC <- all %>%
+  filter(race != 'Multiracial') %>% # exclude multiracial participants
+  select(ParticID, race, gender, site, ageCent, ageAtTest, asianPref:whitePref, income_W:income_L, natIncome_W:natIncome_L,pop_W:pop_L ) %>% # select columns used in analyses
+  pivot_longer(asianPref:whitePref,names_to = "target", values_to = "att") %>%  # pivot to long, 4 obs per participant
+  mutate(ingroup = case_when(race=='White' & target=='whitePref' ~ 1,   # code for ingroup
+                             race=='Asian' & target=='asianPref' ~ 1,
+                             race=='Black' & target=='blackPref' ~1,
+                             race=='Latinx' & target=='latinxPref' ~1,
+                             TRUE ~ 0),
+         locStatus = case_when(target=='whitePref' ~ income_W,  # create individual columns for predictors tagged to racial target
+                               target=='asianPref' ~ income_A,
+                               target=='blackPref' ~ income_B,
+                               target=='latinxPref' ~ income_L),
+         natStatus = case_when(target=='whitePref' ~ natIncome_W,
+                               target=='asianPref' ~ natIncome_A,
+                               target=='blackPref' ~ natIncome_B,
+                               target=='latinxPref' ~ natIncome_L),
+         pct = case_when(target=='whitePref' ~ pop_W,
+                               target=='asianPref' ~ pop_A,
+                               target=='blackPref' ~ pop_B,
+                               target=='latinxPref' ~ pop_L)) %>%
+  
+  select(-(income_W:pop_L)) # drop unnecessary columns
+
+```
+
+Basic results from these four research questions are as follows:
+
+1. No significant effects associated with either status IV, either as main effect of interaction
+2. There is a statistically significant effect of the ingroup IV, indicating higher ratings of one's ingroup, but only in a model in which all other terms have been dropped (following our pre-registered inclusion criteria, via the drop1 command)
+3. As none of these terms were significant, we did not assess this question.
+4. the Pct IV was not stastistically significant.
+
+With these considerations in mind, this analysis does not provide support for the hypothesis that there is a relationship betweeh social status (as operationalized via average income at the local or national level) or the percent of the local area that is a member of the racial ingroup, and liking for the group in general or the ingroup in particular. However, there is evidence that our sample tended to show higher ratings of the racial ingroup than of other racial groups, i.e. evidence in favor of ingroup racial bias.
+
+This conclusion in part dovetails with the much more detailed analyses presented in the main manuscript, and so we refer interested readers there. 
+
+```{r AAC models, warning=F}
+
+# run main model
+# note that most of these models will not include participants for whom we do not have parent demographic data, hence usable sample of initial models is N = 571. However, the final model retaining only significant terms no longer uses demographics and so is a larger sample.
+
+M1 <- lmer(att ~ (natStatus + locStatus + pct) * ingroup + (1|ParticID), data = AAC) 
+drop1(M1,test='Chisq') # drop locStatus:ingroup
+
+M2 <- lmer(att ~ (natStatus + locStatus + pct) + ingroup + natStatus:ingroup + pct:ingroup + (1|ParticID), data = AAC) 
+drop1(M2,test='Chisq') # drop natStatus:ingroup
+
+M3 <- lmer(att ~ (natStatus + locStatus + pct) + ingroup + pct:ingroup + (1|ParticID), data = AAC) 
+drop1(M3,test='Chisq') # drop pct:ingroup
+
+M4 <- lmer(att ~ (natStatus + locStatus + pct) + ingroup +  (1|ParticID), data = AAC) 
+drop1(M4,test='Chisq') # drop natStatus
+
+M5 <- lmer(att ~ ( locStatus + pct) + ingroup +  (1|ParticID), data = AAC) 
+drop1(M5,test='Chisq') # drop locStatus
+
+M6 <- lmer(att ~ pct + ingroup +  (1|ParticID), data = AAC)
+drop1(M6,test='Chisq') # drop pct
+
+
+M7 <- lmer(att ~ ingroup +  (1|ParticID), data = AAC) 
+drop1(M7,test='Chisq') # retain ingroup
+summary(M7) # final model if retaining only significant terms
+sjPlot::plot_model(M7,type='std') + ggtitle("Ingroup racial preference in attitudes + 95% CIs") + xlab("Standardized beta") + theme_bw()
+
+```
+
+## Race attitudes as predictors of Race-related Behaviors (RRB)
+
+This pre-registration focused on the following research questions: 
+Do racial attitudes predict behavior toward different racial groups? 
+In particular we hypothesized that the degree to which children prefer their own race over other races will predict the degree to which they favor children of their own race on an interpersonal distance task and resource allocation task. 
+We were also interested in exploring how these attitudes  vary based on the racial groups being compared (i.e., White vs. Black, White vs. Latinx, White vs. Asian, etc.)
+
+The analysis focused on the following two approaches:
+
+Correlations between racial attitude scores and the three relative scores from each of the two behavioral tasks. These will be run both overall (i.e., collapsing across participant race) and separated by participant race (White, Black, Latinx, Asian).
+
+To examine the main research question, a multilevel model with target outgroup race nested within people will be run predicting interpersonal distance and resource allocation from the racial attitude scores, race, and gender of the participant. 
+
+**Deviation from preregistration:** 
+1. As above, the specified mixed/multilevel model is mispecified because including a random intercept for region is inappropriate given that with the exception of White participants other racial groups were only included in two regional data collections. That random intercept is ommitted in the model presented below.
+
+2. The preregistration was unclear about whether three scores reflecting the three group-specific race-bias scores would be used or whether the four raw attitude scores would be used. The latter was indicated at some but not other points, but does not make conceptual sense, and so we used the former approach here. That is, we predicted relative behavioral bias with relative attitudinal bias, amountign to three scores per participant (e.g. for a White participant this was White-Black, White-Asian, and White-Latinx). Also not clear in the preregistration was whether each DV would be analyzed separately or together in a single model. However, given the quite different metrics of each DV we opted here to analyze each one separately. 
+
+3. The preregistration indicates that we will run correlations collapsed across race as well as separately by race. However, correlations collapsed across race are not coherent given that members of different races have different kinds of trials; for example, a White participant does not have behavioral measures contrasting Latinx and Black or Latinx and Asian or Asian and Black participants, and a Latinx participant does not have beahvioral measures contrasting White and Asian, White and Black, and Black and Asian participants. Thus, we only run these correlations separately for each racial group. 
+
+
+```{r RRB reshape, warning=F}
+
+
+## some additional variable selection and creation
+RRB <- all %>%
+  filter(race != 'Multiracial') %>% # exclude multiracial participants
+  select(ParticID, race, gender, site, ageCent, ageAtTest, asianPref:whitePref, asianGiving:whiteGiving, asianDist:whiteDist ) %>% # select columns used in analyses
+  # create all the difference scores, all scored such that positive values = ingroup favoritism
+  mutate(WBatt = case_when(race=="White" ~ whitePref-blackPref,
+                           race=="Black" ~ blackPref-whitePref,
+                           TRUE ~ NA),
+         WAatt = case_when(race=="White" ~ whitePref-asianPref,
+                           race=="Asian" ~ asianPref-whitePref,
+                           TRUE ~ NA),
+         WLatt= case_when(race=="White" ~ whitePref-latinxPref,
+                           race=="Latinx" ~ latinxPref-whitePref,
+                           TRUE ~ NA),
+         BAatt = case_when(race=="Black" ~ blackPref-asianPref,
+                           race=="Asian" ~ asianPref-blackPref,
+                           TRUE ~ NA),
+         BLatt = case_when(race=="Black" ~ blackPref-latinxPref,
+                           race=="Latinx" ~ latinxPref-blackPref,
+                           TRUE ~ NA),
+         LAatt = case_when(race=="Latinx" ~ latinxPref-asianPref,
+                           race=="Asian" ~ asianPref-latinxPref,
+                           TRUE ~ NA),
+         WBdist = case_when(race=="White" ~ whiteDist-blackDist,
+                           race=="Black" ~ blackDist-whiteDist,
+                           TRUE ~ NA),
+         WAdist = case_when(race=="White" ~ whiteDist-asianDist,
+                           race=="Asian" ~ asianDist-whiteDist,
+                           TRUE ~ NA),
+         WLdist= case_when(race=="White" ~ whiteDist-latinxDist,
+                           race=="Latinx" ~ latinxDist-whiteDist,
+                           TRUE ~ NA),
+         BAdist = case_when(race=="Black" ~ blackDist-asianDist,
+                           race=="Asian" ~ asianDist-blackDist,
+                           TRUE ~ NA),
+         BLdist = case_when(race=="Black" ~ blackDist-latinxDist,
+                           race=="Latinx" ~ latinxDist-blackDist,
+                           TRUE ~ NA),
+         LAdist = case_when(race=="Latinx" ~ latinxDist-asianDist,
+                           race=="Asian" ~ asianDist-latinxDist,
+                           TRUE ~ NA),
+         WBgive = case_when(race=="White" ~ whiteGiving-blackGiving,
+                           race=="Black" ~ blackGiving-whiteGiving,
+                           TRUE ~ NA),
+         WAgive = case_when(race=="White" ~ whiteGiving-asianGiving,
+                           race=="Asian" ~ asianGiving-whiteGiving,
+                           TRUE ~ NA),
+         WLgive= case_when(race=="White" ~ whiteGiving-latinxGiving,
+                           race=="Latinx" ~ latinxGiving-whiteGiving,
+                           TRUE ~ NA),
+         BAgive = case_when(race=="Black" ~ blackGiving-asianGiving,
+                           race=="Asian" ~ asianGiving-blackGiving,
+                           TRUE ~ NA),
+         BLgive = case_when(race=="Black" ~ blackGiving-latinxGiving,
+                           race=="Latinx" ~ latinxGiving-blackGiving,
+                           TRUE ~ NA),
+         LAgive = case_when(race=="Latinx" ~ latinxGiving-asianGiving,
+                           race=="Asian" ~ asianGiving-latinxGiving,
+                           TRUE ~ NA)) %>%
+  select(-(asianPref:whiteDist)) # drop redundant columns used in difference scores
+
+### create df for correlational analysis
+RRBcorr <- RRB %>%
+  select(race,WBatt:LAgive)
+
+
+## reshape data for mixed model analysis via 3 steps and then a merge (2 IVs + 1 DV)
+RRBdv <- RRB %>%
+  select(ParticID:LAatt) %>%
+  pivot_longer(WBatt:LAatt,
+               names_to = c("target","task"),
+               values_to = "att",
+               names_pattern = "(..)(...)") %>%
+  filter(!is.na(att))
+
+# reshape dv
+RRBdv <- RRB %>%
+  select(ParticID:LAatt) %>%
+  pivot_longer(WBatt:LAatt,
+               names_to = "target",
+               values_to = "att",
+               names_pattern = "(..)") %>%
+  filter(!is.na(att))
+
+# reshape distinance iv
+RRBiv1 <- RRB %>%
+  select(ParticID, WBdist:LAdist) %>%
+  pivot_longer(WBdist:LAdist,
+               names_to = "target",
+               values_to = "dist",
+               names_pattern = "(..)") %>%
+  filter(!is.na(dist))
+
+# reshape giving iv  
+RRBiv2 <- RRB %>%
+  select(ParticID, WBgive:LAgive) %>%
+  pivot_longer(WBgive:LAgive,
+               names_to = "target",
+               values_to = "give",
+               names_pattern = "(..)") %>%
+  filter(!is.na(give))
+
+# merge all three
+RRBlong <- RRBdv %>%
+  left_join(RRBiv1) %>%
+  left_join(RRBiv2)
+
+```
+
+
+We first present results for the **correlational analysis**. For each racial group we present the correlations between the three racial attitude difference scores and the six behavioral scores (3 per behavioral task). 
+These are presented in correlation tables below. 
+Note that because the distance measures are a measure of closeness a smaller value indicated greater closeness and by inference greater positivity; thus we would theoretically expect negative correlations between distance and other bias measures. 
+
+```{r RRB correlationsanalysis, warning=F}
+
+# create dfs for each participant race group
+asian <- filter(RRBcorr,race=="Asian") %>% select(WAatt,BAatt,LAatt,WAdist,BAdist,LAdist,WAgive,BAgive,LAgive)
+black <- filter(RRBcorr,race=="Black") %>% select(WBatt,BAatt,BLatt,WBdist,BAdist,BLdist,WBgive,BAgive,BLgive)
+latinx <- filter(RRBcorr,race=="Latinx") %>% select(WLatt,BLatt,LAatt,WLdist,BLdist,LAdist,WLgive,BLgive,LAgive)
+white <- filter(RRBcorr,race=="White") %>% select(WBatt,WAatt,WLatt,WBdist,WAdist,WLdist,WBgive,WAgive,WLgive)
+
+calc_p_value <- function(vec_a, vec_b, sig_level){
+  test_res <- cor.test(vec_a, vec_b)
+  sig <- if_else(test_res$p.value < sig_level, "*", "")
+  paste0(round(cor.test(vec_a, vec_b)$estimate, 2), sig)
+}
+
+# asian correlations, p < .05 indicated with * if present
+colpair_map(asian, calc_p_value, 0.05) %>%
+  focus(WAdist,BAdist,LAdist,WAgive,BAgive,LAgive)
+
+# black correlations, p < .05 indicated with * if present
+colpair_map(black, calc_p_value, 0.05) %>%
+  focus(WBdist,BAdist,BLdist,WBgive,BAgive,BLgive)
+
+# latinx correlations, p < .05 indicated with * if present
+colpair_map(latinx, calc_p_value, 0.05) %>%
+  focus(WLdist,BLdist,LAdist,WLgive,BLgive,LAgive) 
+
+# white correlations, p < .05 indicated with * if present
+colpair_map(white, calc_p_value, 0.05) %>%
+  focus(WBdist,WAdist,WLdist,WBgive,WAgive,WLgive) 
+
+```
+
+Turning to the **regression analysis predicting seating distance**, no terms reached significance except for the intercept, which here indicates an overall tendency to place racial ingroup members closer than racial outgroup members. In the final model (Mdist7) there was also a marginal effect of attitude, suggesting some relatiopnship between attitude scores and seating distqnce in the expected direction (here a negative estimate because lower/closer seating distqnces and higher attitdue scores both reflect ingropu preference) but given the number of tests run and this relatively weak effect we do not belabor it here.
+
+Turning to the **regression analysis predicting giving/resource allocation**, there was no evidence that attitude scores predicted intergroup giving. However, there was an interaction between race and gender on giving scores, which while not central to our hypothesis and not related to attitudinal variation, we nonetheless provide a plot of below. This analysis suggests that Asian and White girls exhibeted stronger bias in giving behavior than did Asian and White boys, but this pattern was not present in Black or Latinx children.
+
+
+```{r RRB regression, warning=F}
+
+## Predicting seating distance
+Mdist1 <- lmer(dist ~ att*race*gender + (1|ParticID), data = RRBlong)
+drop1(Mdist1,test="Chisq") # drop 3-way
+
+Mdist2 <- lmer(dist ~ (att+race+gender)^2 + (1|ParticID), data = RRBlong)
+drop1(Mdist2,test="Chisq") # drop att:gender
+
+Mdist3 <- lmer(dist ~ (att+race+gender) + att:race + race:gender + (1|ParticID), data = RRBlong)
+drop1(Mdist3,test="Chisq") # drop att:race
+
+Mdist4 <- lmer(dist ~ (att+race+gender) + race:gender + (1|ParticID), data = RRBlong)
+drop1(Mdist4,test="Chisq") # drop race:gender
+
+Mdist5 <- lmer(dist ~ (att+race+gender) + (1|ParticID), data = RRBlong)
+drop1(Mdist5,test="Chisq") # drop race
+
+Mdist6 <- lmer(dist ~ (att+gender) + (1|ParticID), data = RRBlong)
+drop1(Mdist6,test="Chisq") # drop gender
+
+Mdist7 <- lmer(dist ~ att + (1|ParticID) , data = RRBlong)
+summary(Mdist7)
+
+
+## Predicting giving / resource allocation
+Mgive1 <- lmer(give ~ att*race*gender + (1|ParticID), data = RRBlong)
+drop1(Mgive1,test="Chisq") # drop 3-way
+
+Mgive2 <- lmer(give ~ (att+race+gender)^2 + (1|ParticID), data = RRBlong)
+drop1(Mgive2,test="Chisq") # drop att:gender
+
+Mgive3 <- lmer(give ~ (att+race+gender) + race:gender + att:race + (1|ParticID), data = RRBlong)
+drop1(Mgive3,test="Chisq") # drop att:race
+
+Mgive4 <- lmer(give ~ (att+race+gender) + race:gender + (1|ParticID), data = RRBlong)
+drop1(Mgive4,test="Chisq") 
+summary(Mgive4)
+sjPlot::plot_model(Mgive4,type='int')
+
+```
+
+
+## SES as a predictor for race outcomes (SES)
+
+This pre-registration focused on the following research questions: 
+
+RQ 1: Does the socio-economic status of White children predicts the degree to which they favor their own racial group (over other racial groups), the degree to which they see Whites as higher status than other racial groups, their willingness to sit closer to White than other racial groups, and the degree to which they share more resources with White targets (over other racial groups)?
+
+RQ 2: Do children show pro-white bias?  We predict that participants will show a preference for White over non-White targets, will believe Whites are higher status, will sit closer to White targets, and will give more resources to White targets. **Note:** This research question is subsumed by questions and analyses reported in the main manuscript and thus we do not report results here. 
+
+SES was here defined as the average of (z-scored) self-reported income and self-reported highest educational level. 
+
+Analysis for RQ1 proceeds via correlations between child SES and each of the four DVs (attitude, status, seating distance, and giving/resource allocation). We report correlations and partial correlations that control for contact (an averaage of the % non-White friends of child and parent). We predicted that the predicted relation between the IV and DVs will hold even when controlling for contact.
+
+
+
+```{r SES reshape, warning=F}
+
+## select, clean, create necessary variables
+
+# import parent education data and create necessary variables (which were not part of main datafile)
+ed <- read_csv("parentEducation.csv") %>%
+  filter(!is.na(EDU1) | !is.na(EDU2)) %>%
+  mutate(edMean = ifelse(is.na(EDU2),EDU1,(EDU1+EDU2)/2),
+         EdMeanS = (edMean - mean(edMean))/sd(edMean))
+
+SES <- all %>%
+  filter(race=="White") %>%
+  mutate(contact = (friendPct + parentPct)/2,
+         contactS = (contact - mean(contact,na.rm=T))/sd(contact,na.rm=T),
+         SESs = (SES - mean(SES,na.rm=T))/sd(SES,na.rm=T)) %>%
+  select(ParticID,ageAtTest,ingroupAttBias,ingroupStatus,ingroupGiving,ingroupSeating, SES, contact, contactS, SESs) %>%
+  left_join(ed) %>%
+  select(-EDU1,-EDU2) %>%
+  mutate(SESuse = (SESs+EdMeanS)/2) %>%
+  filter(!is.na(SESuse))
+
+
+```
+
+
+Basic results from these four research questions are as follows:
+ - No evidence of correlation between SES and ingroup attitude
+ - No evidence of correlation between SES and ingroup status judgments
+ - No evidence of correlation between SES and ingroup bias in seating decisions
+ - Supoortive (uncorrected) evidence that SES is positively related to bias in giving / resource allcoation, r = .12, partial r controlling for contact r = .14, both .01 < p < .05.
+
+```{r SES analysis, warning=F}
+
+# attitude
+cor.test(SES$ingroupAttBias,SES$SESuse) # 
+att <- SES[c(3,9,13)] %>% filter(!is.na(contactS),!is.na(ingroupAttBias))
+## Partial correlations
+pcor(att)
+
+# status
+cor.test(SES$ingroupStatus,SES$SESuse) # 
+status <- SES[c(4,9,13)] %>% filter(!is.na(contactS),!is.na(ingroupStatus))
+## Partial correlations
+pcor(status)
+
+# seating
+cor.test(SES$ingroupSeating,SES$SESuse) # 
+seating <- SES[c(6,9,13)] %>% filter(!is.na(contactS),!is.na(ingroupSeating))
+## Partial correlations
+pcor(seating)
+
+
+# giving
+cor.test(SES$ingroupGiving,SES$SESuse) # 
+giving <- SES[c(5,9,13)] %>% filter(!is.na(contactS),!is.na(ingroupGiving))
+## Partial correlations
+pcor(giving)
+
+```
+
